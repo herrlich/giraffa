@@ -17,9 +17,6 @@
  */
 package org.apache.giraffa;
 
-import org.apache.hadoop.conf.Configurable;
-import org.apache.hadoop.conf.Configuration;
-
 import java.io.IOException;
 
 /**
@@ -34,37 +31,7 @@ import java.io.IOException;
  * <p>
  * Extend this class to define a specific row key implementation.
  */
-public abstract class RowKey implements Configurable {
-
-  private Configuration conf;
-  private RowKeyFactory keyFactory;
-  private GiraffaProtocol service;
-
-  @Override // Configurable
-  public final Configuration getConf() {
-    return conf;
-  }
-
-  @Override // Configurable
-  public final void setConf(Configuration conf) {
-    this.conf = conf;
-  }
-
-  public final RowKeyFactory getKeyFactory() {
-    return keyFactory;
-  }
-
-  public final void setKeyFactory(RowKeyFactory keyFactory) {
-    this.keyFactory = keyFactory;
-  }
-
-  public final GiraffaProtocol getService() {
-    return service;
-  }
-
-  public final void setService(GiraffaProtocol service) {
-    this.service = service;
-  }
+public abstract class RowKey {
 
   /**
    * Get full path of the file system object represented by the underlying row.
@@ -74,7 +41,7 @@ public abstract class RowKey implements Configurable {
 
   /**
    * Set full path to the file system object represented by the row.
-   * setKey() does not guarantee that the key will be generated,
+   * setPath() does not guarantee that the key will be generated,
    * only that the path is set making it ready for the key generation.
    */
   public abstract void setPath(String src) throws IOException;
@@ -86,7 +53,7 @@ public abstract class RowKey implements Configurable {
    * @return the INode ID at this row, 0 if the INode does not exist, and -1 if
    *         unknown.
    */
-  public abstract long getINodeId();
+  // public abstract long getINodeId();
 
   /**
    * Set the id of the file system object represented by the underlying row.
@@ -94,18 +61,7 @@ public abstract class RowKey implements Configurable {
    * @param inodeId the id of the INode at this row, 0 if the INode does not
    *                exist, and -1 unknown.
    */
-  public abstract void setINodeId(long inodeId);
-
-  public void set(RowKeyFactory keyFactory,
-                  GiraffaProtocol service,
-                  String src,
-                  long inodeId,
-                  byte[] bytes)
-      throws IOException {
-    setKeyFactory(keyFactory);
-    setService(service);
-    set(src, inodeId, bytes);
-  }
+  // public abstract void setINodeId(long inodeId);
 
   public abstract void set(String src, long inodeId, byte[] bytes)
       throws IOException;
@@ -114,7 +70,7 @@ public abstract class RowKey implements Configurable {
    * Get the row key of the file system object.
    * The method should generate the key if it has not been generated before
    * or return the generated value.
-   * @return row key as byte array
+   * @return row key as a byte array
    */
   public abstract byte[] getKey();
 
@@ -122,9 +78,9 @@ public abstract class RowKey implements Configurable {
    * Generate or regenerate the row key based on the path.
    * Key generation can be a distributed operation for some RowKey
    * implementations.
-   * @return row key as byte array
+   * @return row key as a byte array
    */
-  public abstract byte[] generateKey();
+  protected abstract byte[] generateKey(GiraffaProtocol service);
 
   public abstract byte[] getStartListingKey(byte[] startAfter);
 

@@ -131,14 +131,14 @@ public class RowKeyFactory {
       throws IOException {
     RowKey key = ReflectionUtils.newInstance(RowKeyClass, conf);
     if (bytes == null) {
-      key.setKeyFactory(this);
-      key.setService(service);
       key.setPath(src);
-      key.setINodeId(inodeId);
     } else {
-      key.set(this, service, src, inodeId, bytes);
+      key.set(src, inodeId, bytes);
     }
 
+    // SHV !!! not good
+    if(key instanceof FileIdRowKey)
+      ((FileIdRowKey)key).setService(service);
     if (isCaching() && key.shouldCache()) {
       Cache.put(src, key);
     }

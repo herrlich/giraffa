@@ -32,7 +32,6 @@ public class FileIdRowKey extends RowKey implements Serializable {
 
   private static final long serialVersionUID = 123456789009L;
   private static final Log LOG = LogFactory.getLog(FileIdRowKey.class);
-  private static final String DEPTH_KEY = "grfa.fileidrowkey.depth";
   private static final int DEPTH_DEFAULT = 3;
 
   private static boolean initialized;
@@ -40,6 +39,8 @@ public class FileIdRowKey extends RowKey implements Serializable {
   private static int lastIdOffset;
   private static byte[] ROOT_KEY;
   private static byte[] ERROR_KEY;
+
+  private GiraffaProtocol service;
 
   private String src;
   private long inodeId = -1;
@@ -49,6 +50,12 @@ public class FileIdRowKey extends RowKey implements Serializable {
 
   public FileIdRowKey() {}
 
+  public FileIdRowKey(String src, GiraffaProtocol service) {
+    this.src = src;
+    this.service = service;
+  }
+
+  
   @Override // RowKey
   public String getPath() {
     return src;
@@ -59,30 +66,23 @@ public class FileIdRowKey extends RowKey implements Serializable {
     this.src = src;
   }
 
-  @Override // RowKey
-  public long getINodeId() {
-    try {
-      computeINodeId();
-      return inodeId;
-    } catch (IOException e) {
-      LOG.error("Failed to compute INode ID for " + getPath(), e);
-      return -1;
-    }
+  public void setService(GiraffaProtocol service) {
+    this.service = service;
   }
 
   private void computeINodeId() throws IOException {
+    assert service != null : "service is null";
     try {
       if (inodeId == -1) {
         inodeId = bytes != null ?
             RowKeyBytes.toLong(bytes, length - 8) :
-            getService().getFileId(getParentKey(), getPath());
+            service.getFileId(getParentKey(), getPath());
       }
     } finally {
       shouldCache = inodeId > 0;
     }
   }
 
-  @Override // RowKey
   public void setINodeId(long inodeId) {
     this.inodeId = inodeId;
     shouldCache = inodeId > 0;
@@ -102,7 +102,7 @@ public class FileIdRowKey extends RowKey implements Serializable {
   }
 
   @Override // RowKey
-  public byte[] generateKey() {
+  public byte[] generateKey(GiraffaProtocol service) {
     initialize();
 
     if (new Path(getPath()).isRoot()) {
@@ -130,18 +130,12 @@ public class FileIdRowKey extends RowKey implements Serializable {
     if (startAfter.length == 0) {
       b = getKey();
       lshift(b, 8);
-      putLong(b, lastIdOffset, 0);
     } else {
-      try {
-        Path p = new Path(getPath(), new String(startAfter));
-        RowKey startKey = getKeyFactory().newInstance(p.toString());
-        b = startKey.getKey();
-        putLong(b, lastIdOffset, startKey.getINodeId() + 1);
-      } catch (IOException e) {
-        LOG.error("Failed to get start listing key for " + getPath(), e);
-        return ERROR_KEY;
-      }
+      Path p = new Path(getPath(), new String(startAfter));
+      RowKey startKey = new FileIdRowKey(p.toString(), service);
+      b = startKey.getKey();
     }
+    putLong(b, lastIdOffset, 0);
     return b;
   }
 
@@ -191,13 +185,13 @@ public class FileIdRowKey extends RowKey implements Serializable {
 
   private void generateKeyIfNull() {
     if (bytes == null) {
-      bytes = generateKey();
+      bytes = generateKey(service);
     }
   }
 
   private void initialize() {
     if (!initialized) {
-      int depth = getConf().getInt(DEPTH_KEY, DEPTH_DEFAULT);
+      int depth = DEPTH_DEFAULT;
       length = 8 * depth;
       lastIdOffset = length - 8;
       ROOT_KEY = new byte[length];
@@ -213,7 +207,7 @@ public class FileIdRowKey extends RowKey implements Serializable {
   private byte[] getParentKey() throws IOException {
     if (parentKey == null) {
       String parent = new Path(getPath()).getParent().toString();
-      parentKey = getKeyFactory().newInstance(parent).getKey();
+      parentKey =  new FileIdRowKey(parent, service).getKey();
     }
     return parentKey;
   }
