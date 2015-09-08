@@ -19,21 +19,20 @@ package org.apache.giraffa;
 
 import java.io.IOException;
 
-public abstract class RowKeyFactory {
+public class FullPathRowKeyFactory extends RowKeyFactory {
 
-  private GiraffaProtocol service;
-
-  void setService(GiraffaProtocol service) {
-    this.service = service;
+  @Override // RowKeyFactory
+  public RowKey getRowKey(String src) throws IOException {
+    return new FullPathRowKey(src);
   }
 
-  public GiraffaProtocol getService() {
-    return service;
+  @Override // RowKeyFactory
+  public RowKey getRowKey(String src, long inodeId) throws IOException {
+    return getRowKey(src);
   }
 
-  public abstract RowKey getRowKey(String src) throws IOException;
-
-  public abstract RowKey getRowKey(String src, long inodeId) throws IOException;
-
-  public abstract RowKey getRowKey(String src, byte[] bytes) throws IOException;
+  @Override // RowKeyFactory
+  public RowKey getRowKey(String src, byte[] bytes) throws IOException {
+    return new FullPathRowKey(src, bytes);
+  }
 }

@@ -90,7 +90,7 @@ public class TestLeaseManagement {
     GiraffaFileSystem.format(conf, false);
     grfs = (GiraffaFileSystem) FileSystem.get(conf);
     connection = ConnectionFactory.createConnection(conf);
-    keyFactory = RowKeyFactory.newInstance(grfs);
+    keyFactory = RowKeyFactoryProvider.createFactory(grfs);
     nodeManager = GiraffaTestUtils.getNodeManager(conf, connection, keyFactory);
   }
 

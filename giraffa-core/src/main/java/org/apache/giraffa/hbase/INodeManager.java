@@ -107,7 +107,7 @@ public class INodeManager implements Closeable {
    * @return INode for the specified path
    */
   public INode getINode(String path) throws IOException {
-    return getINode(keyFactory.newInstance(path));
+    return getINode(keyFactory.getRowKey(path));
   }
 
   /**
@@ -356,7 +356,7 @@ public class INodeManager implements Closeable {
 
   public void setXAttr(String path, XAttr xAttr) throws IOException {
     long ts = Time.now();
-    RowKey rowKey = keyFactory.newInstance(path);
+    RowKey rowKey = keyFactory.getRowKey(path);
     Put put = new Put(rowKey.getKey(), ts);
     String realColumnName = XAttrHelper.getPrefixName(xAttr);
     put.addColumn(FileField.getFileExtendedAttributes(),
@@ -365,17 +365,17 @@ public class INodeManager implements Closeable {
   }
 
   public List<XAttr> getXAttrs(String path) throws IOException {
-    RowKey rowKey = keyFactory.newInstance(path);
+    RowKey rowKey = keyFactory.getRowKey(path);
     Result result = getNSTable().get(new Get(rowKey.getKey()));
     return FileFieldDeserializer.getXAttrs(result);
   }
 
   public void removeXAttr(String path, XAttr xAttr) throws IOException {
-    RowKey rowKey = keyFactory.newInstance(path);
+    RowKey rowKey = keyFactory.getRowKey(path);
     Delete delete = new Delete(rowKey.getKey());
     String realColumnName = XAttrHelper.getPrefixName(xAttr);
     delete.addColumns(FileField.getFileExtendedAttributes(),
-                      Bytes.toBytes(realColumnName));
+        Bytes.toBytes(realColumnName));
     getNSTable().delete(delete);
   }
 
@@ -406,8 +406,7 @@ public class INodeManager implements Closeable {
   }
 
   private INode newINode(String src, Result result) throws IOException {
-    long id = FileFieldDeserializer.getId(result);
-    RowKey key = keyFactory.newInstance(src, id, result.getRow());
+    RowKey key = keyFactory.getRowKey(src, result.getRow());
     if (FileFieldDeserializer.getDirectory(result)) {
       return new INodeDirectory(key,
           FileFieldDeserializer.getId(result),

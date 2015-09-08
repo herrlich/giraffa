@@ -96,7 +96,7 @@ public class TestGiraffaUpgrade {
     GiraffaFileSystem.format(conf, false);
     grfs = (GiraffaFileSystem) FileSystem.get(conf);
     connection = ConnectionFactory.createConnection(conf);
-    keyFactory = RowKeyFactory.newInstance(grfs);
+    keyFactory = RowKeyFactoryProvider.createFactory(grfs);
     nodeManager = GiraffaTestUtils.getNodeManager(conf, connection, keyFactory);
   }
 
@@ -204,7 +204,7 @@ public class TestGiraffaUpgrade {
 
         // COMMIT IT!
         INode node;
-        RowKey key = keyFactory.newInstance(path, id);
+        RowKey key = keyFactory.getRowKey(path, id);
         if (isDirectory) {
           node = new INodeDirectory(key, id, modTime.getTime(),
               accessTime.getTime(), userName, groupName, perm, null, null,

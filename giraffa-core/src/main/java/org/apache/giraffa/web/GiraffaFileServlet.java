@@ -13,6 +13,7 @@ import org.apache.giraffa.GiraffaFileSystem;
 import org.apache.giraffa.RowKey;
 import org.apache.giraffa.RowKeyBytes;
 import org.apache.giraffa.RowKeyFactory;
+import org.apache.giraffa.RowKeyFactoryProvider;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
@@ -60,7 +61,7 @@ public class GiraffaFileServlet extends HttpServlet {
     } catch (IOException e) {
       throw new ServletException(e);
     }
-    keyFactory = RowKeyFactory.newInstance(grfs);
+    keyFactory = RowKeyFactoryProvider.createFactory(grfs);
   }
 
   @Override
@@ -159,7 +160,7 @@ public class GiraffaFileServlet extends HttpServlet {
   }
 
   private FileItem convertToFileItem(FileStatus stat) throws IOException {
-    RowKey rowKey = keyFactory.newInstance(stat.getPath().toUri().getPath());
+    RowKey rowKey = keyFactory.getRowKey(stat.getPath().toUri().getPath());
     FileItem file = new FileItem(rowKey, stat.getModificationTime(),
         stat.getAccessTime(), stat.getOwner(), stat.getGroup(),
         stat.getPermission(), (stat.isSymlink() ? RowKeyBytes.toBytes(

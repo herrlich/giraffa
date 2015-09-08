@@ -17,8 +17,6 @@
  */
 package org.apache.giraffa;
 
-import java.io.IOException;
-
 /**
  * Abstract class defining a row key for a file system object in the
  * Namespace Table in HBase.<br>
@@ -40,33 +38,6 @@ public abstract class RowKey {
   public abstract String getPath();
 
   /**
-   * Set full path to the file system object represented by the row.
-   * setPath() does not guarantee that the key will be generated,
-   * only that the path is set making it ready for the key generation.
-   */
-  public abstract void setPath(String src) throws IOException;
-
-  /**
-   * Get the id of the file system object represented by the underlying row.
-   * Implementations are not required to store or compute the id and may safely
-   * return -1 instead.
-   * @return the INode ID at this row, 0 if the INode does not exist, and -1 if
-   *         unknown.
-   */
-  // public abstract long getINodeId();
-
-  /**
-   * Set the id of the file system object represented by the underlying row.
-   * Implementations are not required to store or use this id in any way.
-   * @param inodeId the id of the INode at this row, 0 if the INode does not
-   *                exist, and -1 unknown.
-   */
-  // public abstract void setINodeId(long inodeId);
-
-  public abstract void set(String src, long inodeId, byte[] bytes)
-      throws IOException;
-
-  /**
    * Get the row key of the file system object.
    * The method should generate the key if it has not been generated before
    * or return the generated value.
@@ -80,17 +51,11 @@ public abstract class RowKey {
    * implementations.
    * @return row key as a byte array
    */
-  protected abstract byte[] generateKey(GiraffaProtocol service);
+  public abstract byte[] generateKey();
 
   public abstract byte[] getStartListingKey(byte[] startAfter);
 
   public abstract byte[] getStopListingKey();
-
-  /**
-   * Return whether or not the generated key should be cached. This method will
-   * first generate the key if it has not already been done.
-   */
-  public abstract boolean shouldCache();
 
   @Override // Object
   public abstract boolean equals(Object o);

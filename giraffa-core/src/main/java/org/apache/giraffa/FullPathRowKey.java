@@ -33,10 +33,16 @@ public class FullPathRowKey extends RowKey implements Serializable {
   private String path;
   private byte[] bytes;
 
-  public FullPathRowKey() {}
-
-  FullPathRowKey(String src) throws IOException {
+  public FullPathRowKey(String src) throws IOException {
     setPath(src);
+  }
+
+  public FullPathRowKey(String src, byte[] bytes) throws IOException {
+    set(src, bytes);
+  }
+
+  private FullPathRowKey(String src, byte[] bytes, short d) {
+    initialize(d, src, bytes);
   }
 
   private void initialize(short d, String src, byte[] bytes) {
@@ -46,8 +52,7 @@ public class FullPathRowKey extends RowKey implements Serializable {
     this.bytes = bytes;  // not generated yet
   }
 
-  @Override // RowKey
-  public void setPath(String src) throws IOException {
+  private void setPath(String src) throws IOException {
     if(!src.startsWith(SEPARATOR))
       throw new IOException("Cannot calculate key for a relative path: " + src);
     int d = depth(src);
@@ -55,8 +60,7 @@ public class FullPathRowKey extends RowKey implements Serializable {
     initialize((short)d, src, null);
   }
 
-  @Override // RowKey
-  public void set(String src, long inodeId, byte[] bytes) throws IOException {
+  private void set(String src, byte[] bytes) throws IOException {
     initialize(RowKeyBytes.toShort(bytes), src, bytes);
     assert RowKeyBytes.compareTo(RowKeyBytes.toBytes(src), 0,
         RowKeyBytes.toBytes(src).length, bytes, 2, bytes.length-2) == 0 : 
@@ -87,12 +91,12 @@ public class FullPathRowKey extends RowKey implements Serializable {
   @Override // RowKey
   public byte[] getKey() {
     if(bytes == null)
-      bytes = generateKey(null);
+      bytes = generateKey();
     return bytes.clone();
   }
 
   @Override // RowKey
-  protected byte[] generateKey(GiraffaProtocol service) {
+  public byte[] generateKey() {
     return RowKeyBytes.add(RowKeyBytes.toBytes(depth),
         RowKeyBytes.toBytes(path));
   }
@@ -106,11 +110,6 @@ public class FullPathRowKey extends RowKey implements Serializable {
   @Override // RowKey
   public byte[] getStopListingKey() {
     return RowKeyBytes.add(directoryStartKey(), new byte[]{Byte.MAX_VALUE});
-  }
-
-  @Override // RowKey
-  public boolean shouldCache() {
-    return true;
   }
 
   @Override // Object
@@ -134,8 +133,6 @@ public class FullPathRowKey extends RowKey implements Serializable {
 
   private byte[] directoryStartKey() {
     String startPath = path.endsWith("/") ? path : path + "/";
-    FullPathRowKey startKey = new FullPathRowKey();
-    startKey.initialize((short) (depth + 1), startPath, null);
-    return startKey.getKey();
+    return new FullPathRowKey(startPath, null, (short) (depth + 1)).getKey();
   }
 }

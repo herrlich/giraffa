@@ -71,6 +71,7 @@ import org.apache.giraffa.INode;
 import org.apache.giraffa.RenameState;
 import org.apache.giraffa.RowKey;
 import org.apache.giraffa.RowKeyFactory;
+import org.apache.giraffa.RowKeyFactoryProvider;
 import org.apache.giraffa.UnlocatedBlock;
 import org.apache.giraffa.GiraffaConstants.FileState;
 import org.apache.giraffa.XAttrOp;
@@ -201,15 +202,15 @@ public class NamespaceProcessor implements GiraffaProtocol,
     String unlimited = (xAttrMaxSize == 0) ? " (unlimited)" : "";
     LOG.info("Maximum size of an xAttr:" + xAttrMaxSize + unlimited);
 
-    keyFactory = new RowKeyFactory(this, conf);
+    keyFactory = RowKeyFactoryProvider.createFactory(conf, this);
     int configuredLimit = conf.getInt(
         GiraffaConfiguration.GRFA_LIST_LIMIT_KEY,
         GiraffaConfiguration.GRFA_LIST_LIMIT_DEFAULT);
     this.lsLimit = configuredLimit > 0 ?
         configuredLimit : GiraffaConfiguration.GRFA_LIST_LIMIT_DEFAULT;
-    LOG.info("Caching is set to: " + RowKeyFactory.isCaching());
-    LOG.info("RowKey is set to: " +
-        RowKeyFactory.getRowKeyClass().getCanonicalName());
+    LOG.info("Caching is set to: " + RowKeyFactoryProvider.isCaching());
+    LOG.info("RowKeyFactory is set to: " +
+        RowKeyFactoryProvider.getFactoryClass().getCanonicalName());
     
     // Get the checksum type from config
     String checksumTypeStr = conf.get(DFS_CHECKSUM_TYPE_KEY,
@@ -258,7 +259,7 @@ public class NamespaceProcessor implements GiraffaProtocol,
   public long getFileId(byte[] parentKey, String src) throws IOException {
     Path srcPath = new Path(src);
     String parentPath = srcPath.getParent().toString();
-    RowKey parentRowKey = keyFactory.newInstance(parentPath, -1, parentKey);
+    RowKey parentRowKey = keyFactory.getRowKey(parentPath, parentKey);
     return nodeManager.findINodeId(parentRowKey, srcPath);
   }
 
@@ -333,7 +334,7 @@ public class NamespaceProcessor implements GiraffaProtocol,
       UnresolvedLinkException, IOException {
     INodeFile iNode;
     if (fileId != GRANDFATHER_INODE_ID) {
-      INode node = nodeManager.getINode(keyFactory.newInstance(src, fileId));
+      INode node = nodeManager.getINode(keyFactory.getRowKey(src, fileId));
       if (node == null) {
         throw new FileNotFoundException("Path does not exist: " + src);
       }
@@ -441,7 +442,7 @@ public class NamespaceProcessor implements GiraffaProtocol,
       FileLease fileLease =
           leaseManager.addLease(new FileLease(clientName, src, time));
       long id = nodeManager.nextINodeId();
-      RowKey key = keyFactory.newInstance(src, id);
+      RowKey key = keyFactory.getRowKey(src, id);
       iFile = new INodeFile(key, id, time, time, pc.getUser(),
           iParent.getGroup(), masked, null, null, 0, replication, blockSize,
           FileState.UNDER_CONSTRUCTION, fileLease, null, null);
@@ -812,7 +813,7 @@ public class NamespaceProcessor implements GiraffaProtocol,
 
     long time = now();
     long id = nodeManager.nextINodeId();
-    RowKey key = keyFactory.newInstance(src, id);
+    RowKey key = keyFactory.getRowKey(src, id);
     inode = new INodeDirectory(key, id, time, time, pc.getUser(),
         iParent.getGroup(), masked, null, null, 0, 0);
 
@@ -874,7 +875,7 @@ public class NamespaceProcessor implements GiraffaProtocol,
       masked = setUWX(inheritPermissions ? iParent.getPermission() : masked);
     }
 
-    RowKey key = keyFactory.newInstance(src.toString(), id);
+    RowKey key = keyFactory.getRowKey(src.toString(), id);
     INodeDirectory inode = new INodeDirectory(key, id, time, time, user, group,
         masked, null, null, 0, 0);
     nodeManager.updateINode(inode);
@@ -953,11 +954,12 @@ public class NamespaceProcessor implements GiraffaProtocol,
 
     // atomic in-place rename if src and dst keys are equal
     if(rootSrcNode != null && rootDstNode == null) {
+      long id = rootSrcNode.getId();
       RowKey srcKey = rootSrcNode.getRowKey();
-      RowKey dstKey = keyFactory.newInstance(dst, rootSrcNode.getId());
+      RowKey dstKey = keyFactory.getRowKey(dst, id);
       if (srcKey.equals(dstKey)) {
         LOG.debug("Applying atomic in-place rename");
-        rootDstNode = rootSrcNode.cloneWithNewRowKey(dstKey);
+        rootDstNode = rootSrcNode.cloneWithNewRowKey(dstKey, id);
         nodeManager.updateINode(rootDstNode);
         return;
       }
@@ -1028,13 +1030,17 @@ public class NamespaceProcessor implements GiraffaProtocol,
    */
   private INode copyWithRenameFlag(INode srcNode, String dst)
       throws IOException {
-    RowKey srcKey = srcNode.getRowKey();
-    String src = srcKey.getPath();
-    LOG.debug("Copying " + src + " to " + dst + " with rename flag");
-    RowKey dstKey = keyFactory.newInstance(dst, nodeManager.nextINodeId());
-    INode dstNode = srcNode.cloneWithNewRowKey(dstKey);
-    dstNode.setRenameState(RenameState.TRUE(srcKey.getKey()));
-    nodeManager.updateINode(dstNode, null, nodeManager.getXAttrs(src));
+    INode dstNode = nodeManager.getINode(dst);
+    if (dstNode == null) {
+      RowKey srcKey = srcNode.getRowKey();
+      String src = srcKey.getPath();
+      LOG.debug("Copying " + src + " to " + dst + " with rename flag");
+      long id = nodeManager.nextINodeId();
+      RowKey dstKey = keyFactory.getRowKey(dst, id);
+      dstNode = srcNode.cloneWithNewRowKey(dstKey, id);
+      dstNode.setRenameState(RenameState.TRUE(srcKey.getKey()));
+      nodeManager.updateINode(dstNode, null, nodeManager.getXAttrs(src));
+    }
     return dstNode;
   }
 

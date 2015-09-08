@@ -77,7 +77,7 @@ public class TestRename {
     GiraffaFileSystem.format(conf, false);
     grfs = (GiraffaFileSystem) FileSystem.get(conf);
     connection = ConnectionFactory.createConnection(conf);
-    keyFactory = RowKeyFactory.newInstance(grfs);
+    keyFactory = RowKeyFactoryProvider.createFactory(grfs);
     nodeManager = GiraffaTestUtils.getNodeManager(conf, connection, keyFactory);
   }
 
@@ -121,8 +121,9 @@ public class TestRename {
     if (stage == PUT_SETFLAG) {
       LOG.debug("Copying " + src + " to " + dst + " with rename flag");
       INode srcNode = nodeManager.getINode(src);
-      RowKey dstKey = keyFactory.newInstance(dst, nodeManager.nextINodeId());
-      INode dstNode = srcNode.cloneWithNewRowKey(dstKey);
+      long id = nodeManager.nextINodeId();
+      RowKey dstKey = keyFactory.getRowKey(dst, id);
+      INode dstNode = srcNode.cloneWithNewRowKey(dstKey, id);
       dstNode.setRenameState(RenameState.TRUE(srcNode.getRowKey().getKey()));
       nodeManager.updateINode(dstNode, null, nodeManager.getXAttrs(src));
     }

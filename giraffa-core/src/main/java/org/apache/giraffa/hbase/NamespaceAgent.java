@@ -51,6 +51,7 @@ import org.apache.giraffa.GiraffaProtocolServiceTranslatorPB;
 import org.apache.giraffa.GiraffaProtos.GiraffaProtocolService;
 import org.apache.giraffa.NamespaceService;
 import org.apache.giraffa.RowKeyFactory;
+import org.apache.giraffa.RowKeyFactoryProvider;
 import org.apache.hadoop.fs.BatchedRemoteIterator.BatchedEntries;
 import org.apache.hadoop.fs.CacheFlag;
 import org.apache.hadoop.fs.ContentSummary;
@@ -146,7 +147,7 @@ public class NamespaceAgent implements NamespaceService {
 
   @Override // NamespaceService
   public void initialize(GiraffaConfiguration conf) throws IOException {
-    this.keyFactory = new RowKeyFactory(this, conf);
+    this.keyFactory = RowKeyFactoryProvider.createFactory(conf, this);
     this.connection = ConnectionFactory.createConnection(conf);
     this.hbAdmin = connection.getAdmin();
     String tableName = getGiraffaTableName(conf);
@@ -182,7 +183,7 @@ public class NamespaceAgent implements NamespaceService {
   }
 
   private GiraffaProtocol getRegionProxy(String src) throws IOException {
-    return getRegionProxy(keyFactory.newInstance(src).getKey());
+    return getRegionProxy(keyFactory.getRowKey(src).getKey());
   }
 
   private GiraffaProtocol getRegionProxy(byte[] key) throws IOException {
