@@ -17,6 +17,8 @@
  */
 package org.apache.giraffa.hbase;
 
+import static org.apache.hadoop.hdfs.server.namenode.INodeId.ROOT_INODE_ID;
+
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -33,6 +35,8 @@ import org.apache.giraffa.INodeFile;
 import org.apache.giraffa.RowKey;
 import org.apache.giraffa.RowKeyBytes;
 import org.apache.giraffa.RowKeyFactory;
+import org.apache.giraffa.id.IdGeneratorService;
+import org.apache.giraffa.id.SegmentedIdGenerator;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.XAttr;
 import org.apache.hadoop.hbase.client.Delete;
@@ -45,6 +49,7 @@ import org.apache.hadoop.hbase.client.Scan;
 import org.apache.hadoop.hbase.util.Bytes;
 import org.apache.hadoop.hdfs.XAttrHelper;
 import org.apache.hadoop.hdfs.protocol.HdfsFileStatus;
+import org.apache.hadoop.util.IdGenerator;
 import org.apache.hadoop.util.Time;
 
 import com.google.common.collect.Iterables;
@@ -55,12 +60,15 @@ import com.google.common.collect.Iterables;
  */
 public class INodeManager implements Closeable {
   private static final Log LOG = LogFactory.getLog(INodeManager.class);
+  private static final String INODE_ID_SERVICE_NAME = "inodeId";
+  private static final long INODE_ID_SERVICE_INITIAL = -1;
   private static final byte[] EMPTY = new byte[0];
 
   /** The Namespace table */
   private final RowKeyFactory keyFactory;
   private Table nsTable;
-  private INodeIdGenerator idGen;
+  private final IdGeneratorService inodeIdService;
+  private final IdGenerator inodeIdGenerator;
 
   public INodeManager(RowKeyFactory keyFactory,
                       Table nsTable)
@@ -68,7 +76,10 @@ public class INodeManager implements Closeable {
     this.keyFactory = keyFactory;
     assert nsTable != null : "nsTable is null";
     this.nsTable = nsTable;
-    idGen = new INodeIdGenerator(nsTable.getConfiguration());
+    inodeIdService = new ZKSequentialNumber(INODE_ID_SERVICE_NAME,
+        INODE_ID_SERVICE_INITIAL, nsTable.getConfiguration());
+    inodeIdService.initialize();
+    inodeIdGenerator = new SegmentedIdGenerator(ROOT_INODE_ID, inodeIdService);
   }
 
   @Override
@@ -79,13 +90,10 @@ public class INodeManager implements Closeable {
         nsTable.close();
         nsTable = null;
       }
-      if(idGen != null) {
-        idGen.close();
-        idGen = null;
-      }
     } catch (IOException e) {
       LOG.error("Cannot close table: ", e);
     }
+    inodeIdService.close();
   }
 
   public INode getParentINode(String path) throws IOException {
@@ -372,7 +380,7 @@ public class INodeManager implements Closeable {
   }
 
   public long nextINodeId() throws IOException {
-    return idGen.nextId();
+    return inodeIdGenerator.nextValue();
   }
 
   public long findINodeId(RowKey parentKey, Path src) throws IOException {
@@ -402,6 +410,7 @@ public class INodeManager implements Closeable {
     RowKey key = keyFactory.newInstance(src, id, result.getRow());
     if (FileFieldDeserializer.getDirectory(result)) {
       return new INodeDirectory(key,
+          FileFieldDeserializer.getId(result),
           FileFieldDeserializer.getMTime(result),
           FileFieldDeserializer.getATime(result),
           FileFieldDeserializer.getUserName(result),
@@ -413,6 +422,7 @@ public class INodeManager implements Closeable {
           FileFieldDeserializer.getNsQuota(result));
     } else {
       return new INodeFile(key,
+          FileFieldDeserializer.getId(result),
           FileFieldDeserializer.getMTime(result),
           FileFieldDeserializer.getATime(result),
           FileFieldDeserializer.getUserName(result),
